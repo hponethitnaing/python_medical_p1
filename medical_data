@@ -1,0 +1,76 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = pd.read_csv('data.csv')
+
+df['height meter'] = df['height']/100
+
+df['BMI'] = df['weight']/df['height meter'] **2
+
+df['over_weight'] = (df['BMI']>25).astype(int)
+
+df.head()
+
+# Normalize cholesterol and glucose (0: good, 1: bad)
+def normalize_features(df):
+  df['cholesterol_norm'] = df['cholesterol'].replace({1: 0, 2: 1, 3: 1})
+  df['gluc_norm'] = df['gluc'].replace({1: 0, 2: 1, 3: 1})
+  return df
+
+# Apply normalization function
+df = normalize_features(df.copy())  # Operate on a copy to avoid modifying original data
+
+# Print the DataFrame to see the new columns (optional)
+df.head()
+
+# Clean the data (filter incorrect entries)
+filtered_df = df[ (df['ap_lo'] <= df['ap_hi']) &  # Diastolic <= Systolic
+                   (df['height'] >= df['height'].quantile(0.025)) &  # Height >= 2.5th percentile
+                   (df['height'] <= df['height'].quantile(0.975)) &  # Height <= 97.5th percentile
+                   (df['weight'] >= df['weight'].quantile(0.025)) &  # Weight >= 2.5th percentile
+                   (df['weight'] <= df['weight'].quantile(0.975))  # Weight <= 97.5th percentile
+                 ]
+
+# Define features for value counts (excluding numeric features)
+categorical_features = ['smoke', 'alco', 'active', 'overweight']
+
+# Option 1 (explicit conversion for categorical features):
+
+# Convert categorical features to string type (optional but recommended)
+for feature in categorical_features:
+    filtered_df[feature] = filtered_df[feature].astype(str)
+
+
+
+df_long = pd.melt(filtered_df, id_vars=['cardio'], value_vars=categorical_features)
+df_long.rename(columns={'value': 'feature_value'}, inplace=True)
+
+# Create the categorical plot with splitting by 'cardio'
+g = sns.catplot(
+    hue="feature_value",  # Set hue to represent categories (already contains counts)
+    y="cardio",
+    col="cardio",  # Split by cardio to create separate charts
+    data=df_long,
+    kind="count"  # Specify kind as count plot
+)
+
+# Customize the plot (optional)
+g.fig.suptitle("Distribution of Features by Cardio Status")  # Add a title
+g.fig.subplots_adjust(top=0.88)  # Adjust spacing for title
+
+# Rotate x-axis labels for better readability (optional)
+g.despine(bottom=True)  # Remove bottom spine
+plt.xticks(rotation=45)  # Rotate x-axis labels
+
+# Display the plot
+plt.show()
+
+# Calculate the correlation matrix
+corr_matrix = filtered_df.corr()
+
+# Create a heatmap with masked upper triangle
+plt.figure(figsize=(10, 6))  # Adjust figure size as needed
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', mask=np.triu(np.ones_like(corr_matrix, dtype=bool)))
+plt.title('Correlation Matrix')
+plt.show()
